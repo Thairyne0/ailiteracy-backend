@@ -1,0 +1,64 @@
+generator client {
+  provider     = "prisma-client"
+  output       = "../src/generated/prisma"
+  moduleFormat = "esm"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum LeadType {
+  ENTE
+  AZIENDA
+}
+
+enum EmailStatus {
+  SENT
+  FAILED
+}
+
+/// Ogni invio del form. Lo stesso ente può comparire più volte (audit).
+model Lead {
+  id                String        @id @default(uuid())
+  type              LeadType
+  nomeEnte          String
+  regione           String?
+  settore           String?
+  /// 11 cifre, senza spazi
+  partitaIva        String
+  referente         String
+  email             String
+  telefono          String
+  privacyAcceptedAt DateTime
+  createdAt         DateTime      @default(now())
+  discountCode      DiscountCode?
+  emails            EmailLog[]
+
+  @@index([partitaIva])
+  @@index([createdAt])
+}
+
+/// Un codice per ente di formazione, identificato dalla partita IVA.
+model DiscountCode {
+  id         String    @id @default(uuid())
+  code       String    @unique
+  partitaIva String    @unique
+  lead       Lead      @relation(fields: [leadId], references: [id])
+  leadId     String    @unique
+  issuedAt   DateTime  @default(now())
+  redeemedAt DateTime?
+}
+
+model EmailLog {
+  id        String      @id @default(uuid())
+  lead      Lead        @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  leadId    String
+  to        String
+  template  String
+  status    EmailStatus
+  error     String?
+  createdAt DateTime    @default(now())
+
+  @@index([leadId])
+}
