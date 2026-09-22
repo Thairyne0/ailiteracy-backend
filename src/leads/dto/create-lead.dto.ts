@@ -64,6 +64,12 @@ export class CreateLeadDto {
   @Equals(true, { message: "Devi dichiarare di aver letto l'informativa privacy" })
   privacy: boolean;
 
+  /** Data di revisione dell'informativa mostrata all'utente (es. "2026-09-21"). */
+  @IsOptional()
+  @IsString()
+  @MaxLength(32)
+  privacyVersion?: string;
+
   /** Honeypot anti-spam: se valorizzato la richiesta viene ignorata. */
   @IsOptional()
   @IsString()

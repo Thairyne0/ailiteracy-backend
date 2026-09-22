@@ -28,6 +28,8 @@ export const envSchema = z.object({
   MAIL_REPLY_TO: optionalEmail,
 
   FRONTEND_URL: z.url(),
+  /** Mesi di conservazione dei lead (informativa §5). 0 = cancellazione automatica disattivata. */
+  RETENTION_MONTHS: z.coerce.number().int().min(0).max(120).default(24),
   LEAD_NOTIFY_TO: optionalEmail,
   DISCOUNT_PERCENT: z
     .string()

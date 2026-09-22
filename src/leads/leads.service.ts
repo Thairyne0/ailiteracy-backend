@@ -49,6 +49,7 @@ export class LeadsService {
         email: dto.email,
         telefono: dto.telefono,
         privacyAcceptedAt: new Date(),
+        privacyVersion: dto.privacyVersion ?? null,
       },
     });
     this.logger.log(`Lead ${lead.id} creato (${type})`);
@@ -96,6 +97,50 @@ export class LeadsService {
     }
     await this.sendForLead(lead, discountCode);
     return { ok: true, discountCode };
+  }
+
+  /** Art. 15 GDPR: tutti i dati associati a un indirizzo email. */
+  async exportSubject(email: string) {
+    const normalized = email.trim().toLowerCase();
+    const leads = await this.prisma.lead.findMany({
+      where: { email: { equals: normalized, mode: 'insensitive' } },
+      orderBy: { createdAt: 'asc' },
+      include: { discountCode: true, emails: { orderBy: { createdAt: 'asc' } } },
+    });
+    return { email: normalized, exportedAt: new Date().toISOString(), leads };
+  }
+
+  /** Art. 17 GDPR: cancella lead, log email e codici associati a un indirizzo email. */
+  async eraseSubject(email: string): Promise<{ deletedLeads: number; deletedCodes: number }> {
+    const normalized = email.trim().toLowerCase();
+    return this.prisma.$transaction(async (tx) => {
+      const leads = await tx.lead.findMany({
+        where: { email: { equals: normalized, mode: 'insensitive' } },
+        select: { id: true },
+      });
+      const ids = leads.map((l) => l.id);
+      if (ids.length === 0) return { deletedLeads: 0, deletedCodes: 0 };
+      const codes = await tx.discountCode.deleteMany({ where: { leadId: { in: ids } } });
+      await tx.emailLog.deleteMany({ where: { leadId: { in: ids } } });
+      const deleted = await tx.lead.deleteMany({ where: { id: { in: ids } } });
+      this.logger.log(`Cancellazione su richiesta: ${deleted.count} lead, ${codes.count} codici`);
+      return { deletedLeads: deleted.count, deletedCodes: codes.count };
+    });
+  }
+
+  /** Cancella i lead più vecchi di `months` mesi (retention dichiarata nell'informativa). */
+  async purgeOlderThan(months: number): Promise<{ deletedLeads: number; deletedCodes: number }> {
+    const cutoff = new Date();
+    cutoff.setMonth(cutoff.getMonth() - months);
+    return this.prisma.$transaction(async (tx) => {
+      const leads = await tx.lead.findMany({ where: { createdAt: { lt: cutoff } }, select: { id: true } });
+      const ids = leads.map((l) => l.id);
+      if (ids.length === 0) return { deletedLeads: 0, deletedCodes: 0 };
+      const codes = await tx.discountCode.deleteMany({ where: { leadId: { in: ids } } });
+      await tx.emailLog.deleteMany({ where: { leadId: { in: ids } } });
+      const deleted = await tx.lead.deleteMany({ where: { id: { in: ids } } });
+      return { deletedLeads: deleted.count, deletedCodes: codes.count };
+    });
   }
 
   /** Email al richiedente (+ eventuale copia interna). Un fallimento non blocca la risposta. */

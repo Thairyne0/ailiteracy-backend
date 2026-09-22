@@ -31,6 +31,8 @@ model Lead {
   email             String
   telefono          String
   privacyAcceptedAt DateTime
+  /// Versione dell'informativa accettata (data di revisione), per accountability.
+  privacyVersion    String?
   createdAt         DateTime      @default(now())
   discountCode      DiscountCode?
   emails            EmailLog[]

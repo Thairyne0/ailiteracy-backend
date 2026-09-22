@@ -105,6 +105,65 @@ describe('Leads API (e2e)', () => {
     });
   });
 
+  it('salva la versione dell\'informativa accettata', async () => {
+    await request(app.getHttpServer())
+      .post('/leads')
+      .set('x-api-key', KEY!)
+      .send({ ...ente, privacyVersion: '2026-09-21' })
+      .expect(201);
+    const lead = await prisma.lead.findFirstOrThrow();
+    expect(lead.privacyVersion).toBe('2026-09-21');
+    expect(lead.privacyAcceptedAt).toBeInstanceOf(Date);
+  });
+
+  it('GET /leads/subject esporta tutti i dati di una email', async () => {
+    await request(app.getHttpServer()).post('/leads').set('x-api-key', KEY!).send(ente).expect(201);
+    const res = await request(app.getHttpServer())
+      .get('/leads/subject?email=E2E@example.com')
+      .set('x-api-key', KEY!)
+      .expect(200);
+    expect(res.body.leads).toHaveLength(1);
+    expect(res.body.leads[0].discountCode.code).toMatch(/^AILIT-/);
+    expect(res.body.leads[0].emails).toHaveLength(1);
+  });
+
+  it('DELETE /leads/subject cancella lead, codice e log', async () => {
+    await request(app.getHttpServer()).post('/leads').set('x-api-key', KEY!).send(ente).expect(201);
+    await request(app.getHttpServer())
+      .post('/leads')
+      .set('x-api-key', KEY!)
+      .send({ ...ente, email: 'altro@example.com', partitaIva: '99999999902' })
+      .expect(201);
+    const res = await request(app.getHttpServer())
+      .delete('/leads/subject?email=e2e@example.com')
+      .set('x-api-key', KEY!)
+      .expect(200);
+    expect(res.body).toEqual({ deletedLeads: 1, deletedCodes: 1 });
+    expect(await prisma.lead.count()).toBe(1);
+    expect(await prisma.discountCode.count()).toBe(1);
+    expect(await prisma.emailLog.count()).toBe(1);
+  });
+
+  it('DELETE /leads/subject con email invalida → 400', async () => {
+    await request(app.getHttpServer()).delete('/leads/subject?email=nope').set('x-api-key', KEY!).expect(400);
+  });
+
+  it('retention: cancella solo i lead più vecchi della soglia', async () => {
+    await request(app.getHttpServer()).post('/leads').set('x-api-key', KEY!).send(ente).expect(201);
+    const old = await prisma.lead.create({
+      data: {
+        type: 'AZIENDA', nomeEnte: 'Vecchia', settore: 'Altro', partitaIva: '99999999903',
+        referente: 'A B', email: 'old@example.com', telefono: '3331234567',
+        privacyAcceptedAt: new Date('2023-01-01'), createdAt: new Date('2023-01-01'),
+      },
+    });
+    const { LeadsService } = await import('../src/leads/leads.service.js');
+    const res = await app.get(LeadsService).purgeOlderThan(24);
+    expect(res.deletedLeads).toBe(1);
+    expect(await prisma.lead.findUnique({ where: { id: old.id } })).toBeNull();
+    expect(await prisma.lead.count()).toBe(1);
+  });
+
   it('POST /leads/:id/resend rispedisce e logga', async () => {
     await request(app.getHttpServer()).post('/leads').set('x-api-key', KEY!).send(ente).expect(201);
     const lead = await prisma.lead.findFirstOrThrow();

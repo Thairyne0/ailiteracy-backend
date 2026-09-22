@@ -26,6 +26,8 @@ Header `X-Api-Key: <API_KEY>` su tutte le rotte tranne `/health`.
 | POST | `/leads` | crea lead; body come il form del front. Risposta `{ ok, discountCode? }` |
 | GET | `/leads?type=ente\|azienda&page=1&pageSize=20` | lista paginata con codice e ultima email |
 | POST | `/leads/:id/resend` | rispedisce l'email prevista per il tipo |
+| GET | `/leads/subject?email=` | diritto di accesso (art. 15): tutti i dati di un'email |
+| DELETE | `/leads/subject?email=` | diritto alla cancellazione (art. 17): elimina lead, codici, log |
 | GET | `/health` | stato servizio e DB |
 
 ## Test
@@ -38,6 +40,7 @@ npm run test:e2e  # richiede Postgres (docker compose) — nessuna email parte
 ## Configurazione
 
 Vedi `.env.example`. `SMTP_HOST=json` disattiva l'invio (utile in sviluppo).
+`RETENTION_MONTHS` (default 24) cancella ogni notte alle 3 i lead più vecchi, come dichiarato nell'informativa; 0 disattiva.
 `LEAD_NOTIFY_TO` invia una copia interna per ogni lead; `DISCOUNT_PERCENT` mostra la percentuale
 in email e PDF. Le fasce del listino PDF sono in `src/config/listino.ts` (valori placeholder).
 
