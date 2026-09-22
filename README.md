@@ -44,6 +44,11 @@ Vedi `.env.example`. `SMTP_HOST=json` disattiva l'invio (utile in sviluppo).
 `LEAD_NOTIFY_TO` invia una copia interna per ogni lead; `DISCOUNT_PERCENT` mostra la percentuale
 in email e PDF. Le fasce del listino PDF sono in `src/config/listino.ts` (valori placeholder).
 
+## Deploy
+
+Istruzioni per Plesk: [`DEPLOY.md`](DEPLOY.md). Variabili di produzione: `.env.production.example`.
+In alternativa l'immagine Docker (`Dockerfile`) è pronta per qualsiasi piattaforma a container.
+
 ## Integrazione front-end
 
 Nel front-end impostare `BACKEND_URL=http://localhost:4000` e `BACKEND_API_KEY` uguale ad `API_KEY`.
